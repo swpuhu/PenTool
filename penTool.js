@@ -6,15 +6,91 @@ container.style.cssText = `
 `
 
 document.body.appendChild(container);
+
+let canvas = document.createElement('canvas');
+canvas.width = 640;
+canvas.height = 360;
+document.body.appendChild(canvas);
+let ctx = canvas.getContext('2d');
+
+/**
+ * 
+ * @param {Point[]} points 
+ * @param {number} p 
+ */
+function getPointInBezier(points, p) {
+    const invT = 1 - p;
+    return Point.add(
+        Point.multiple(points[0], invT ** 3),
+        Point.multiple(points[1], 3 * p * invT ** 2),
+        Point.multiple(points[2], 3 * p ** 2 * invT),
+        Point.multiple(points[3], p ** 3)
+    )
+}
+
+function getBezierPoints(points, step = 10) {
+    let ret = [];
+    for (let i = 0; i <= step; i++) {
+        ret.push(getPointInBezier(points, i / step));
+    }
+    return ret;
+}
+
+
+function splitBezier(points, t) {
+    let p01 = Point.add(Point.multiple(points[0], 1 - t), Point.multiple(points[1], t));
+    let p11 = Point.add(Point.multiple(points[1], 1 - t), Point.multiple(points[2], t));
+    let p21 = Point.add(Point.multiple(points[2], 1 - t), Point.multiple(points[3], t));
+    let p02 = Point.add(Point.multiple(p01, 1 - t), Point.multiple(p11, t));
+    let p12 = Point.add(Point.multiple(p11, 1 - t), Point.multiple(p21, t));
+    let q = Point.add(Point.multiple(p02, 1 - t), Point.multiple(p12, t));
+    return [
+        [points[0], p01, p02, q],
+        [q, p12, p21, points[3]]
+    ];
+}
+function drawPoints(points) {
+    ctx.beginPath();
+    for (let i = 0; i < points.length - 1; i++) {
+        let curPoint = points[i];
+        let nextPoint = points[i + 1];
+        ctx.moveTo(curPoint.x, curPoint.y);
+        ctx.lineTo(nextPoint.x, nextPoint.y);
+    }
+    ctx.stroke();
+}
+
+
+class Point {
+    constructor (x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+Point.add = function (...args) {
+    let ret = new Point(0, 0);
+    for (let i = 0; i < args.length; i++) {
+        ret.x += args[i].x;
+        ret.y += args[i].y;
+    }
+    return ret;
+}
+
+Point.multiple = function (point, scalar) {
+    return new Point(point.x * scalar, point.y * scalar);
+}
+
 class LinkedListNode {
-    constructor (value) {
+    constructor(value) {
         this.value = value;
         this.next = null;
         this.prev = null;
     }
 }
+
 class LinkedList {
-    constructor (value = []) {
+    constructor(value = []) {
         this.head = null;
         this.tail = null;
         this.currentPos = null;
@@ -46,14 +122,14 @@ window.LinkedList = LinkedList;
 
 
 class Base {
-    constructor () {
+    constructor() {
         this.eventList = {};
         this.on = this.on.bind(this);
         this.off = this.off.bind(this);
         this.dispatch = this.dispatch.bind(this);
     }
 
-    on (name, fn) {
+    on(name, fn) {
         if (!this.eventList[name]) {
             this.eventList[name] = [];
         }
@@ -107,7 +183,7 @@ class Vec2 {
 }
 
 
-class Path extends Base{
+class Path extends Base {
     /**
      * 
      * @param {HTMLElement} container 
@@ -124,8 +200,10 @@ class Path extends Base{
         this.init();
         this.path = new LinkedList();
         this.currentAnchor = null;
+        this.head = null;
         this.anchors = [];
         this.curves = [];
+        this.looped = false;
         this.stroke = '#00ffaa';
         this.fill = 'transparent';
     }
@@ -133,10 +211,20 @@ class Path extends Base{
     init() {
         let that = this;
         container.onmousedown = function (e) {
+            if (that.looped) return;
             let x = e.offsetX;
             let y = e.offsetY;
             let anchor = new Anchor(x, y);
             that.currentAnchor = anchor;
+            if (that.path.length === 0) {
+                anchor.isHead = true;
+            }
+            anchor.on('loop', function () {
+                that.looped = true;
+                that.path.tail.next = that.path.head;
+                let line = new Line(that.path.tail.value, that.path.head.value);
+                that.svg.appendChild(line.ref);
+            });
             anchor.on('select', function () {
                 that.currentAnchor = anchor;
             });
@@ -151,9 +239,9 @@ class Path extends Base{
                 let line = new Line(anchor1.value, anchor2.value);
                 that.svg.appendChild(line.ref);
             }
-            
+
             that.update();
-            
+
 
             function move(ev) {
                 let offsetX = ev.clientX - e.clientX;
@@ -204,7 +292,7 @@ class Line extends Base {
      * @param {Anchor} anchor1 
      * @param {Anchor} anchor2 
      */
-    constructor (anchor1, anchor2) {
+    constructor(anchor1, anchor2) {
         super();
         this.anchor1 = anchor1;
         this.anchor2 = anchor2;
@@ -221,7 +309,7 @@ class Line extends Base {
         });
     }
 
-    update () {
+    update() {
         let anchor1 = this.anchor1;
         let anchor2 = this.anchor2;
         this.ref.setAttribute('d', `
@@ -232,7 +320,7 @@ class Line extends Base {
                 ${anchor2.x + anchor2.arm2.x + anchor2.armSize / 2} ${anchor2.y + anchor2.arm2.y + anchor2.armSize / 2}
                 ${anchor2.x + anchor2.size / 2} ${anchor2.y + anchor2.size / 2}`);
     }
-    getElement () {
+    getElement() {
         let that = this;
         let curve = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         curve.setAttribute('stroke', that.stroke);
@@ -241,7 +329,7 @@ class Line extends Base {
     }
 }
 
-class Anchor extends Base{
+class Anchor extends Base {
     constructor(x, y) {
         super();
         this.arm1 = new Vec2(0, 0);
@@ -297,11 +385,12 @@ class Anchor extends Base{
 
         point.addEventListener('mousedown', function (e) {
             e.stopPropagation();
-
-            if (e.altKey) {
-                let event = new MouseEvent('mousedown', { clientX: e.clientX, clientY: e.clientY });
-                arm1.dispatchEvent(event);
-            } else if (e.ctrlKey) {
+            e.preventDefault();
+            let ctrlKey = e.ctrlKey;
+            if (/mac/i.test(navigator.platform)) {
+                ctrlKey = e.metaKey;
+            }
+            if (ctrlKey) {
                 let initX = that.x;
                 let initY = that.y;
                 that.dispatch('select');
@@ -319,6 +408,11 @@ class Anchor extends Base{
 
                 document.addEventListener('mousemove', move);
                 document.addEventListener('mouseup', up);
+            } else if (e.altKey) {
+                let event = new MouseEvent('mousedown', { clientX: e.clientX, clientY: e.clientY });
+                arm1.dispatchEvent(event);
+            } else if (that.isHead) {
+                that.dispatch('loop');
             }
         });
         arm1.onmousedown = function (e) {
