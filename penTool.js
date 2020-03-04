@@ -155,9 +155,6 @@ window.LinkedList = LinkedList;
 class Base {
     constructor() {
         this.eventList = {};
-        this.on = this.on.bind(this);
-        this.off = this.off.bind(this);
-        this.dispatch = this.dispatch.bind(this);
     }
 
     on(name, fn) {
@@ -269,6 +266,9 @@ class Path extends Base {
                 let anchor1 = anchor2.prev;
                 let line = new Line(anchor1.value, anchor2.value);
                 anchor2.value.on('delete', function () {
+                    if (that.currentAnchor === anchor2.value) {
+                        that.currentAnchor = null;
+                    }
                     let ret = that.path.find(anchor2);
                     if (ret) {
                         let next = ret.next;
@@ -367,11 +367,13 @@ class Line extends Base {
         });
 
         anchor1.on('delete', function () {
-            that.remove();
+            that && that.remove();
+            that = null;
         });
 
         anchor2.on('delete', function () {
-            that.remove();
+            that && that.remove();
+            that = null;
         })
     }
 
@@ -396,6 +398,7 @@ class Line extends Base {
 
     remove() {
         this.ref.remove();
+        this.anchor1 = this.anchor2 = null;
     }
 }
 
@@ -485,11 +488,13 @@ class Anchor extends Base {
                 that.dispatch('loop');
             } else {
                 that.delete();
+                that = null;
             }
         });
         arm1.onmousedown = function (e) {
             e.preventDefault();
             e.stopPropagation();
+            that.dispatch('select');
             let arm1StartPosX = e.clientX;
             let arm1StartPosY = e.clientY;
             let arm1InitPosX = that.arm1.x;
@@ -520,6 +525,7 @@ class Anchor extends Base {
         arm2.onmousedown = function (e) {
             e.preventDefault();
             e.stopPropagation();
+            that.dispatch('select');
             let arm2StartPosX = e.clientX;
             let arm2StartPosY = e.clientY;
             let arm1InitPosX = that.arm1.x;
@@ -583,6 +589,23 @@ class Anchor extends Base {
     delete () {
         this.ref.remove();
         this.dispatch('delete');
+        this.eventList = null;
+        this.ref = null;
+    }
+
+    hideArm1() {
+        this.arm1Element.style.display = 'none';
+    }
+
+    hideArm2() {
+        this.arm2Element.style.display = 'none';
+    }
+
+    showArm1() {
+        this.arm1Element.style.display = 'block';
+    }
+    showArm2() {
+        this.arm2Element.style.display = 'block';
     }
 }
 
