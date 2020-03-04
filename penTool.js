@@ -110,6 +110,7 @@ class LinkedList {
             this.tail = node;
         }
         this.length++;
+        return node;
     }
 
     find(item) {
@@ -228,9 +229,8 @@ class Path extends Base {
         this.init();
         this.path = new LinkedList();
         this.currentAnchor = null;
+        this.anchorCurveMap = new Map();
         this.head = null;
-        this.anchors = [];
-        this.curves = [];
         this.looped = false;
         this.stroke = '#00ffaa';
         this.fill = 'transparent';
@@ -247,43 +247,57 @@ class Path extends Base {
             if (that.path.length === 0) {
                 anchor.isHead = true;
             }
+            that.svg.appendChild(anchor.ref);
+            let node = that.path.push(anchor);
             anchor.on('loop', function () {
-                that.looped = true;
-                that.path.tail.next = that.path.head;
-                let line = new Line(that.path.tail.value, that.path.head.value);
-                that.svg.appendChild(line.ref);
+                // that.looped = true;
+                // that.path.tail.next = that.path.head;
+                // let line = new Line();
+                // that.svg.appendChild(line.ref);
             });
             anchor.on('select', function () {
                 that.currentAnchor = anchor;
             });
             anchor.on('update', function () {
-                that.update();
+                that.update(node);
             });
-            that.svg.appendChild(anchor.ref);
-            that.path.push(anchor);
             if (that.path.length > 1) {
                 let anchor2 = that.path.tail;
                 let anchor1 = anchor2.prev;
-                let line = new Line(anchor1.value, anchor2.value);
+                let line = new Line();
+                anchor1.value.rightLine = line;
+                anchor2.value.leftLine = line;
                 anchor2.value.on('delete', function () {
                     if (that.currentAnchor === anchor2.value) {
                         that.currentAnchor = null;
                     }
+                    anchor2.value.leftLine && anchor2.value.leftLine.delete();
+                    anchor2.value.rightLine && anchor2.value.rightLine.delete();
                     let ret = that.path.find(anchor2);
                     if (ret) {
                         let next = ret.next;
                         let prev = ret.prev;
+                        if (next) {
+                            next.value.leftLine = null;
+                        }
+                        if (prev) {
+                            prev.value.rightLine = null;
+                        }
+                        
                         that.path.delete(anchor2);
                         if (next && prev) {
                             let line = new Line(prev.value, next.value);
+                            next.value.leftLine = line;
+                            prev.value.rightLine = line;
                             that.svg.appendChild(line.ref);
+                            that.update(next);
                         }
                     }
                 })
+                
                 that.svg.appendChild(line.ref);
             }
-
-            that.update();
+            that.update(node);
 
             let threshold = 20;
             function move(ev) {
@@ -310,24 +324,16 @@ class Path extends Base {
         }
     }
 
-    update(loop = false) {
-        if (this.anchors.length > 1) {
-            for (let i = 0; i < this.anchors.length; i++) {
-                let curAnchor = this.anchors[i];
-                if (!loop && i + 1 >= this.anchors.length) {
-                    break;
-                }
-                let nextAnchor = this.anchors[(i + 1) % this.anchors.length];
-                let curCurve = this.curves[i];
-                curCurve.setAttribute('d', `
-                M 
-                ${curAnchor.x + curAnchor.size / 2} ${curAnchor.y + curAnchor.size / 2}
-                C 
-                ${curAnchor.x + curAnchor.arm1.x + curAnchor.armSize / 2} ${curAnchor.y + curAnchor.arm1.y + curAnchor.armSize / 2}, 
-                ${nextAnchor.x + nextAnchor.arm2.x + nextAnchor.armSize / 2} ${nextAnchor.y + nextAnchor.arm2.y + nextAnchor.armSize / 2}
-                ${nextAnchor.x + nextAnchor.size / 2} ${nextAnchor.y + nextAnchor.size / 2}`);
-            }
+    update (node) {
+        let anchor = node.value;
+        if (node.prev) {
+            anchor.leftLine.update(node.prev.value, anchor);
+
         }
+        if (node.next) {
+            anchor.rightLine.update(anchor, node.next.value);
+        }
+
     }
 
     findAnchor(anchor) {
@@ -345,41 +351,14 @@ class Path extends Base {
 }
 
 class Line extends Base {
-    /**
-     * 
-     * @param {Anchor} anchor1 
-     * @param {Anchor} anchor2 
-     */
-    constructor(anchor1, anchor2) {
+    constructor() {
         super();
-        this.anchor1 = anchor1;
-        this.anchor2 = anchor2;
         this.stroke = '#00ffaa';
         this.fill = 'transparent';
         this.ref = this.getElement();
-        let that = this;
-        this.update();
-        anchor1.on('update', function () {
-            that.update();
-        });
-        anchor2.on('update', function () {
-            that.update();
-        });
-
-        anchor1.on('delete', function () {
-            that && that.remove();
-            that = null;
-        });
-
-        anchor2.on('delete', function () {
-            that && that.remove();
-            that = null;
-        })
     }
 
-    update() {
-        let anchor1 = this.anchor1;
-        let anchor2 = this.anchor2;
+    update(anchor1, anchor2) {
         this.ref.setAttribute('d', `
                 M 
                 ${anchor1.x + anchor1.size / 2} ${anchor1.y + anchor1.size / 2}
@@ -396,9 +375,8 @@ class Line extends Base {
         return curve;
     }
 
-    remove() {
+    delete() {
         this.ref.remove();
-        this.anchor1 = this.anchor2 = null;
     }
 }
 
@@ -414,6 +392,7 @@ class Anchor extends Base {
         this.fill = '#00ffaa';
         this.lineColor = '#000';
         this.relative = true;
+        this.curves = [];
         this.ref = this.getElement();
     }
 
@@ -591,6 +570,8 @@ class Anchor extends Base {
         this.dispatch('delete');
         this.eventList = null;
         this.ref = null;
+        this.leftLine = null;
+        this.rightLine = null;
     }
 
     hideArm1() {
@@ -606,6 +587,17 @@ class Anchor extends Base {
     }
     showArm2() {
         this.arm2Element.style.display = 'block';
+    }
+
+    addCurve(curve) {
+        this.curves.push(curve);
+    }
+
+    deleteCurve(curve) {
+        let index = this.curves.indexOf(curve);
+        if (index > -1) {
+            this.curves.splice(index ,1);
+        }
     }
 }
 
