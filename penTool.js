@@ -111,6 +111,37 @@ class LinkedList {
         }
         this.length++;
     }
+
+    find(item) {
+        let p = this.head;
+        let ret = null;
+        while(p) {
+            if (p === item) {
+                ret = p;
+                break;
+            }
+            p = p.next;
+        }
+        return ret;
+    }
+
+    delete(item) {
+        let pos = this.find(item);
+        if (pos === this.head) {
+            this.head = this.head.next;
+            this.head.prev = null;
+        } else if (pos === this.tail) {
+            this.tail = this.tail.prev;
+            this.tail.next = null;
+        } else {
+            let prev = pos.prev;
+            let next = pos.next;
+            prev.next = next;
+            next.prev = prev;
+        }
+        pos = null;
+    }
+
     init(value = []) {
         for (let i = 0; i < value.length; i++) {
             this.push(value[i]);
@@ -237,15 +268,30 @@ class Path extends Base {
                 let anchor2 = that.path.tail;
                 let anchor1 = anchor2.prev;
                 let line = new Line(anchor1.value, anchor2.value);
+                anchor2.value.on('delete', function () {
+                    let ret = that.path.find(anchor2);
+                    if (ret) {
+                        let next = ret.next;
+                        let prev = ret.prev;
+                        that.path.delete(anchor2);
+                        if (next && prev) {
+                            let line = new Line(prev.value, next.value);
+                            that.svg.appendChild(line.ref);
+                        }
+                    }
+                })
                 that.svg.appendChild(line.ref);
             }
 
             that.update();
 
-
+            let threshold = 20;
             function move(ev) {
                 let offsetX = ev.clientX - e.clientX;
                 let offsetY = ev.clientY - e.clientY;
+                if (Math.abs(offsetY) <= threshold && Math.abs(offsetX) <= threshold) {
+                    return;
+                }
                 anchor.arm1.x = offsetX - (anchor.size / 2);
                 anchor.arm1.y = offsetY - (anchor.size / 2);
                 anchor.arm2.x = -(offsetX - (anchor.size / 2));
@@ -284,6 +330,18 @@ class Path extends Base {
         }
     }
 
+    findAnchor(anchor) {
+        let p = this.path.head;
+        let ret = null;
+        while (p) {
+            if (p === anchor) {
+                ret = p;
+                break;
+            }
+            p = p.next;
+        }
+        return ret;
+    }
 }
 
 class Line extends Base {
@@ -307,6 +365,14 @@ class Line extends Base {
         anchor2.on('update', function () {
             that.update();
         });
+
+        anchor1.on('delete', function () {
+            that.remove();
+        });
+
+        anchor2.on('delete', function () {
+            that.remove();
+        })
     }
 
     update() {
@@ -326,6 +392,10 @@ class Line extends Base {
         curve.setAttribute('stroke', that.stroke);
         curve.setAttribute('fill', that.fill);
         return curve;
+    }
+
+    remove() {
+        this.ref.remove();
     }
 }
 
@@ -413,6 +483,8 @@ class Anchor extends Base {
                 arm1.dispatchEvent(event);
             } else if (that.isHead) {
                 that.dispatch('loop');
+            } else {
+                that.delete();
             }
         });
         arm1.onmousedown = function (e) {
@@ -506,6 +578,11 @@ class Anchor extends Base {
         this.line2Element.setAttribute('x2', this.x + this.arm2.x + this.armSize);
         this.line2Element.setAttribute('y2', this.y + this.arm2.y + this.armSize);
         this.dispatch('update');
+    }
+
+    delete () {
+        this.ref.remove();
+        this.dispatch('delete');
     }
 }
 
