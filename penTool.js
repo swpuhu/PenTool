@@ -231,6 +231,20 @@ class Path extends Base {
             anchor.on('update', function () {
                 that.update();
             });
+            anchor.on('delete', function () {
+                let p = that.path.head;
+                while(p) {
+                    if (p.value === anchor) {
+                        break;
+                    }
+                    p = p.next;
+                }
+                p.prev.next = p.next;
+                if (p.next) {
+                    p.next.prev = p.prev;
+                }
+
+            })
             that.svg.appendChild(anchor.ref);
             that.path.push(anchor);
             if (that.path.length > 1) {
@@ -413,6 +427,8 @@ class Anchor extends Base {
                 arm1.dispatchEvent(event);
             } else if (that.isHead) {
                 that.dispatch('loop');
+            } else {
+                that.delete();
             }
         });
         arm1.onmousedown = function (e) {
@@ -506,6 +522,11 @@ class Anchor extends Base {
         this.line2Element.setAttribute('x2', this.x + this.arm2.x + this.armSize);
         this.line2Element.setAttribute('y2', this.y + this.arm2.y + this.armSize);
         this.dispatch('update');
+    }
+
+    delete () {
+        this.ref.remove();
+        this.dispatch('delete');
     }
 }
 
