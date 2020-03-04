@@ -7,13 +7,24 @@
     <title>Document</title>
     <style>
         circle,
-        rect {
+        rect,
+        g{
+            position: absolute;
+            z-index: 10;
             cursor: pointer;
+        }
+
+        path {
+            position: absolute;
+            z-index: -1;
         }
     </style>
 </head>
 <body>
     
 </body>
+<script src="./common.js"></script>
+<script src="./Anchor.js"></script>
+<script src="./Line.js"></script>
 <script src="./penTool.js"></script>
 </html>
