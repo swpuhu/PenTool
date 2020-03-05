@@ -8,7 +8,9 @@ class Anchor extends Base {
         this.armSize = this.size / 2;
         this.x = x;
         this.y = y;
-        this.fill = '#00ffaa';
+        this.fill = '#fff';
+        this.stroke = '#000';
+        this.armFill = '#00ffaa';
         this.lineColor = '#000';
         this.relative = true;
         this.curves = [];
@@ -24,28 +26,29 @@ class Anchor extends Base {
         point.setAttribute('width', this.size);
         point.setAttribute('height', this.size);
         point.setAttribute('fill', this.fill);
+        point.setAttribute('stroke', this.stroke);
 
         let arm1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         arm1.setAttribute('cx', this.x + this.arm1.x + this.size / 2);
         arm1.setAttribute('cy', this.y + this.arm1.y + this.size / 2);
         arm1.setAttribute('r', this.armSize);
-        arm1.setAttribute('fill', this.fill);
+        arm1.setAttribute('fill', this.armFill);
 
         let arm2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         arm2.setAttribute('cx', this.x + this.arm2.x + this.size / 2);
         arm2.setAttribute('cy', this.y + this.arm2.y + this.size / 2);
         arm2.setAttribute('r', this.armSize);
-        arm2.setAttribute('fill', this.fill);
+        arm2.setAttribute('fill', this.armFill);
 
         let line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line1.setAttribute('stroke', this.fill);
+        line1.setAttribute('stroke', this.armFill);
         line1.setAttribute('x1', this.x);
         line1.setAttribute('y1', this.y);
         line1.setAttribute('x2', this.x + this.arm1.x);
         line1.setAttribute('y2', this.y + this.arm1.y);
 
         let line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line2.setAttribute('stroke', this.fill);
+        line2.setAttribute('stroke', this.armFill);
         line2.setAttribute('x1', this.x + this.size / 2);
         line2.setAttribute('y1', this.y + this.size / 2);
         line2.setAttribute('x2', this.x + this.arm2.x + this.armSize / 2);
@@ -195,17 +198,21 @@ class Anchor extends Base {
 
     hideArm1 () {
         this.arm1Element.style.display = 'none';
+        this.line1Element.style.display = 'none';
     }
 
     hideArm2 () {
         this.arm2Element.style.display = 'none';
+        this.line2Element.style.display = 'none';
     }
 
     showArm1 () {
         this.arm1Element.style.display = 'block';
+        this.line1Element.style.display = 'block';
     }
     showArm2 () {
         this.arm2Element.style.display = 'block';
+        this.line2Element.style.display = 'block';
     }
 
     addCurve (curve) {
