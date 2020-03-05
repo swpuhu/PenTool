@@ -1,6 +1,6 @@
 
 class Anchor extends Base {
-    constructor(x, y) {
+    constructor(x, y, isInsert = false) {
         super();
         this.arm1 = new Vec2(0, 0);
         this.arm2 = new Vec2(0, 0);
@@ -14,6 +14,7 @@ class Anchor extends Base {
         this.lineColor = '#000';
         this.relative = true;
         this.curves = [];
+        this.isInsert = isInsert;
         this.ref = this.getElement();
     }
 
@@ -87,7 +88,7 @@ class Anchor extends Base {
                 arm1.dispatchEvent(event);
             } else if (that.isHead) {
                 that.dispatch('loop');
-            } else {
+            } else if (!that.isInsert) {
                 that.delete();
                 that = null;
             }
@@ -190,7 +191,6 @@ class Anchor extends Base {
     delete () {
         this.ref.remove();
         this.dispatch('delete');
-        this.eventList = null;
         this.ref = null;
         this.leftLine = null;
         this.rightLine = null;

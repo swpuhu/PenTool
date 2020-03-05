@@ -56,7 +56,7 @@ class Path extends Base {
     init() {
         let that = this;
         let containerPos = container.getBoundingClientRect();
-        let tempAnchor = new Anchor(0, 0);
+        let tempAnchor = new Anchor(0, 0, true);
         that.svg.appendChild(tempAnchor.ref);
         container.onmousedown = function (e) {
             if (that.looped) return;
@@ -70,10 +70,6 @@ class Path extends Base {
             that.svg.appendChild(anchor.ref);
             let node = that.path.push(anchor);
             anchor.on('loop', function () {
-                // that.looped = true;
-                // that.path.tail.next = that.path.head;
-                // let line = new Line();
-                // that.svg.appendChild(line.ref);
             });
             anchor.on('select', function () {
                 that.hideSomeAnchor(node);
@@ -81,40 +77,19 @@ class Path extends Base {
             anchor.on('update', function () {
                 that.update(node);
             });
+            anchor.on('delete', function () {
+                if (that.currentAnchor === anchor) {
+                    that.currentAnchor = null;
+                }
+                let ret = that.path.find(anchor);
+                if (ret) {
+                    that.path.delete(anchor);
+                }
+                that.update();
+            })
             if (that.path.length > 1) {
                 let anchor2 = that.path.tail;
                 let anchor1 = anchor2.prev;
-                // let line = new Line();
-                // anchor1.value.rightLine = line;
-                // anchor2.value.leftLine = line;
-                anchor2.value.on('delete', function () {
-                    if (that.currentAnchor === anchor2.value) {
-                        that.currentAnchor = null;
-                    }
-                    // anchor2.value.leftLine && anchor2.value.leftLine.delete();
-                    // anchor2.value.rightLine && anchor2.value.rightLine.delete();
-                    let ret = that.path.find(anchor2);
-                    if (ret) {
-                        let next = ret.next;
-                        let prev = ret.prev;
-                        if (next) {
-                            // next.value.leftLine = null;
-                        }
-                        if (prev) {
-                            // prev.value.rightLine = null;
-                        }
-                        
-                        that.path.delete(anchor2);
-                        if (next && prev) {
-                            // let line = new Line(prev.value, next.value);
-                            // next.value.leftLine = line;
-                            // prev.value.rightLine = line;
-                            // that.svg.appendChild(line.ref);
-                            // that.update(next);
-                        }
-                    }
-                    that.update();
-                })
                 
                 // that.svg.appendChild(line.ref);
             }
@@ -144,47 +119,33 @@ class Path extends Base {
             document.addEventListener('mousemove', move);
             document.addEventListener('mouseup', up);
         }
-
+        let isInCurve;
         container.onmousemove = function (e) {
-            let min = containerPos.height;
             let x = e.clientX - containerPos.x;
             let y = e.clientY - containerPos.y;
-            let minI, minJ;
-            for (let i = 0; i < that.points.length; i++) {
-                for (let j = 0; j < that.points[i].length - 1; j++) {
-                    let point = that.points[i][j];
-                    let nextPoint = that.points[i][j + 1];
-                    let distance = that.getDistance(point.x, point.y, nextPoint.x, nextPoint.y, x, y);
-                    let minX = Math.min(point.x, nextPoint.x);
-                    let minY = Math.min(point.y, nextPoint.y);
-                    let maxX = Math.max(point.x, nextPoint.x);
-                    let maxY = Math.max(point.y, nextPoint.y);
-                    if (distance <= min && x >= minX && y >= minY && x <= maxX && y <= maxY) {
-                        min = distance;
-                        minI = i;
-                        minJ = j;
-                    }
-                }
-            }
-            if (min < 5) {
-                let point = that.points[minI][minJ];
-                tempAnchor.x = point.x - tempAnchor.size / 2;
-                tempAnchor.y = point.y - tempAnchor.size / 2;
+            isInCurve = that.isInCurve(x, y);
+            if (isInCurve[0]) {
+                let [x, y] = [isInCurve[1], isInCurve[2]];
+                tempAnchor.x = x - tempAnchor.size / 2;
+                tempAnchor.y = y - tempAnchor.size / 2;
                 tempAnchor.update();
+            }
+        }
 
+        container.onclick = function (e) {
+            if (isInCurve[0]) {
+                let [bool, x, y, point, nextPoint, minI, minJ] = isInCurve;
+                let len = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
+                let sum = 0;
+                for (let i = 0; i <= minJ; i++) {
+                    sum += that.points[minI][1][i];
+                }
+                console.log(sum / that.points[minI][2]);
             }
         }
     }
 
-    update (node) {
-        // let anchor = node.value;
-        // if (node.prev) {
-        //     // anchor.leftLine.update(node.prev.value, anchor);
-
-        // }
-        // if (node.next) {
-        //     // anchor.rightLine.update(anchor, node.next.value);
-        // }
+    update () {
         this.drawCurve();
         this.computePoints();
     }
@@ -271,6 +232,44 @@ class Path extends Base {
         let B = x2 - x1;
         let C = (x1 - x2) * y1 - (y1 - y2) * x1;
         return Math.abs((A * x + B * y + C) / Math.sqrt(A ** 2 + B ** 2));
+    }
+
+    getY (x1, y1, x2, y2, x) {
+        let A = y1 - y2;
+        let B = x2 - x1;
+        let C = (x1 - x2) * y1 - (y1 - y2) * x1;
+        return (-C - A * x) / B;
+    }
+    isInCurve(x, y) {
+        let that = this;
+        let min = 50000;
+        let minI, minJ;
+        let minX, minY, maxX, maxY;
+        
+        for (let i = 0; i < that.points.length; i++) {
+            for (let j = 0; j < that.points[i][0].length - 1; j++) {
+                let point = that.points[i][0][j];
+                let nextPoint = that.points[i][0][j + 1];
+                let distance = that.getDistance(point.x, point.y, nextPoint.x, nextPoint.y, x, y);
+                minY = Math.min(point.y, nextPoint.y);
+                minX = Math.min(point.x, nextPoint.x);
+                maxX = Math.max(point.x, nextPoint.x);
+                maxY = Math.max(point.y, nextPoint.y);
+                if (distance <= min && x >= minX && y >= minY && x <= maxX && y <= maxY) {
+                    min = distance;
+                    minI = i;
+                    minJ = j;
+                }
+            }
+        }
+        if (min < 10) {
+            let point = that.points[minI][0][minJ];
+            let nextPoint = that.points[minI][0][minJ + 1];
+            let y = that.getY(point.x, point.y, nextPoint.x, nextPoint.y, x);
+            return [true, x, y, point, nextPoint, minI, minJ];
+        } else {
+            return [false];
+        }
     }
 }
 

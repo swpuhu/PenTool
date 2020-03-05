@@ -16,10 +16,20 @@ function getPointInBezier (points, p) {
 
 function getBezierPoints (points, step = 10) {
     let ret = [];
+    let length = [];
+    let sumLength = 0;
+    let prevPoint = null;
     for (let i = 0; i <= step; i++) {
-        ret.push(getPointInBezier(points, i / step));
+        let point = getPointInBezier(points, i / step);
+        if (prevPoint) {
+            let len = Point.computeLength(prevPoint, point);
+            length.push(len);
+            sumLength += len;
+        }
+        ret.push(point);
+        prevPoint = point;
     }
-    return ret;
+    return [ret, length, sumLength];
 }
 
 
@@ -67,6 +77,10 @@ Point.multiple = function (point, scalar) {
     return new Point(point.x * scalar, point.y * scalar);
 }
 
+Point.computeLength = function (point1, point2) {
+    return Math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2);
+}
+
 class LinkedListNode {
     constructor(value) {
         this.value = value;
@@ -103,9 +117,16 @@ class LinkedList {
         let p = this.head;
         let ret = null;
         while (p) {
-            if (p === item) {
-                ret = p;
-                break;
+            if (item instanceof LinkedListNode) {
+                if (p === item) {
+                    ret = p;
+                    break;
+                }
+            } else {
+                if (p.value === item) {
+                    ret = p;
+                    break;
+                }
             }
             p = p.next;
         }
@@ -153,7 +174,7 @@ class Base {
 
     off (name, fn) {
         if (!this.eventList[name]) {
-            console.error('no event ' + name);
+            // console.error('no event ' + name);
             return;
         }
         let index = this.eventList[name].indexOf(fn);
@@ -166,7 +187,7 @@ class Base {
         let name = Array.prototype.shift.call(arguments);
         let args = Array.prototype.slice.call(arguments);
         if (!this.eventList[name]) {
-            console.error('no event ' + name);
+            // console.error('no event ' + name);
             return;
         }
         for (let i = 0; i < this.eventList[name].length; i++) {
